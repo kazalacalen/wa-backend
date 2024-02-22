@@ -1,17 +1,21 @@
 import { MongoClient } from 'mongodb';
-import dbConnect from './db'; // ili odredište vašeg db.js modula
+import dotenv from 'dotenv';
 
+dotenv.config();
 
-const registerUser = async (userData) => {
-    const db = await dbConnect();
-
+const dbConnect = async () => {
     try {
-        await db.collection('korisnici').insertOne(userData);
-        console.log('Korisnik uspješno registriran.');
-    } catch (error) {
-        console.error('Došlo je do pogreške prilikom registracije korisnika:', error);
-        throw error;
+        const client = new MongoClient(process.env.DB_CONNECTION_STRING, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+        });
+        await client.connect();
+        console.log('Uspješno povezivanje na MongoDB!');
+        return client.db('apartmani');
+    } catch (err) {
+        console.error('Došlo je do greške prilikom spajanja na MongoDB:', err);
+        throw err;
     }
 };
 
-export { registerUser };
+export default dbConnect;

@@ -1,66 +1,73 @@
-// index.js
-
 import express from 'express';
-import bodyParser from 'body-parser';
-import cors from 'cors';
 import { MongoClient } from 'mongodb';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-app.use(bodyParser.json());
-app.use(cors());
+app.use(express.json());
 
-let connection_string = 'mongodb+srv://admin:admin@cluster0.6drawhd.mongodb.net/?retryWrites=true&w=majority';
-let client = new MongoClient(connection_string, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+let db;
 
-let db = null;
-
-// Povezivanje na MongoDB
+// MongoDB connection
 (async () => {
-  try {
-    await client.connect();
-    db = client.db('apartmani');
-    console.log('Uspješno povezivanje na MongoDB!');
-  } catch (err) {
-    console.error('Došlo je do greške prilikom spajanja na MongoDB:', err);
-  }
+    try {
+        const connection_string = process.env.DB_CONNECTION_STRING;
+        const client = new MongoClient(connection_string);
+        await client.connect();
+        db = client.db('apartmani');
+        console.log('Uspješno povezivanje na MongoDB!');
+    } catch (err) {
+        console.error('Došlo je do greške prilikom spajanja na MongoDB:', err);
+    }
 })();
 
-// Endpoint za registraciju korisnika
-app.post('/SignUp', async (req, res) => {
-  const { username, password, arrivalDate, departureDate } = req.body;
-
-  try {
-    await db.collection('korisnici').insertOne({ username, password, arrivalDate, departureDate });
-    res.status(201).send('Registracija uspješna');
-  } catch (error) {
-    console.error('Greška prilikom registracije korisnika:', error);
-    res.status(500).send('Došlo je do greške prilikom registracije');
-  }
+// Route for registering user
+app.post('/register', async (req, res) => {
+    try {
+        const { username, password, name } = req.body;
+        const hashedPassword = await bcrypt.hash(password, 10);
+        await db.collection('users').insertOne({ username, password: hashedPassword, name });
+        res.status(201).send('Registration successful');
+    } catch (error) {
+        console.error('Error registering user:', error);
+        res.status(500).send('Registration failed');
+    }
 });
 
-// Endpoint za prijavu korisnika
-app.post('/LoginPage', async (req, res) => {
-  const { username, password } = req.body;
-
-  try {
-    const user = await db.collection('korisnici').findOne({ username, password });
-
-    if (user) {
-      res.status(200).send('Prijava uspješna');
-    } else {
-      res.status(401).send('Pogrešno korisničko ime ili lozinka');
+// Route for authenticating user
+app.post('/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const user = await db.collection('users').findOne({ username });
+        if (user && user.password && await bcrypt.compare(password, user.password)) {
+            const token = jwt.sign({ username: user.username }, process.env.JWT_SECRET, { expiresIn: '1 week' });
+            res.status(200).json({ token });
+        } else {
+            res.status(401).send('Authentication failed');
+        }
+    } catch (error) {
+        console.error('Error authenticating user:', error);
+        res.status(401).send('Authentication failed');
     }
-  } catch (error) {
-    console.error('Greška prilikom prijave korisnika:', error);
-    res.status(500).send('Došlo je do greške prilikom prijave');
-  }
+});
+
+// Route for accessing protected resource
+app.get('/protected', async (req, res) => {
+    try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        res.status(200).send(`Welcome ${decoded.username}! You have accessed protected resource.`);
+    } catch (error) {
+        console.error('Error accessing protected resource:', error);
+        res.status(401).send('Access denied');
+    }
 });
 
 app.listen(PORT, () => {
-  console.log(`Server pokrenut na portu ${PORT}`);
+    console.log(`Server pokrenut na portu ${PORT}`);
 });
