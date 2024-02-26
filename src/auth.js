@@ -1,101 +1,71 @@
-import { mapGetters } from 'vuex'; // Dodajemo mapGetters iz Vuex-a
+import mongo from "mongodb";
+import connect from "./db.js";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+
+(async () => {
+  let db = await connect();
+  db.collection("users").createIndex({ username: 1 }, { unique: true });
+})();
 
 export default {
-  data() {
-    return {
-      username: '',
-      password: '',
-      arrivalDate: '',
-      departureDate: '',
+  async registerUser(userData) {
+    let db = await connect();
+    let doc = {
+      username: userData.username,
+      password: await bcrypt.hash(userData.password, 8),
     };
-  },
-  computed: {
-    ...mapGetters(['currentUser']), // Dodajemo getter za trenutno prijavljenog korisnika
-    isUsernameValid() {
-      return this.username.length > 6;
-    },
-    isPasswordValid() {
-      return this.password.length > 6;
-    },
-    isArrivalDateValid() {
-      return !!this.arrivalDate;
-    },
-    isDepartureDateValid() {
-      return !!this.departureDate;
-    },
-  },
-  methods: {
-    signup() {
-      if (!this.isUsernameValid || !this.isPasswordValid || !this.isArrivalDateValid || !this.isDepartureDateValid) {
-        return;
+    try {
+      let result = await db.collection("users").insertOne(doc);
+      if (result && result.insertedId) {
+        return result.insertedId;
       }
-
-      fetch('http://localhost:3000/SignUp', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: this.username,
-          password: this.password,
-          arrivalDate: this.arrivalDate,
-          departureDate: this.departureDate,
-        }),
-      })
-        .then((response) => {
-          if (response.status === 201) {
-            console.log('Registracija uspješna');
-          } else {
-            console.error('Greška prilikom registracije:', response.status);
-          }
-        })
-        .catch((error) => {
-          console.error('Greška prilikom registracije:', error);
-        });
-    },
-    login() {
-      if (!this.isUsernameValid || !this.isPasswordValid) {
-        return;
+    } catch (e) {
+      if (e.name == "MongoServerError" && e.code == 11000) {
+        throw new Error("Username already exists");
       }
+    }
+  },
 
-      fetch('http://localhost:3000/LoginPage', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: this.username,
-          password: this.password,
-        }),
-      })
-        .then((response) => {
-          if (response.status === 200) {
-            console.log('Prijava uspješna');
-            this.$store.dispatch('setUser', this.username); // Pozivamo akciju za postavljanje trenutno prijavljenog korisnika
-          } else if (response.status === 401) {
-            console.warn('Pogrešno korisničko ime ili lozinka');
-          } else {
-            console.error('Greška prilikom prijave:', response.status);
-          }
-        })
-        .catch((error) => {
-          console.error('Greška prilikom prijave:', error);
-        });
-    },
-    logout() {
-      fetch('http://localhost:3000/logout', {
-        method: 'POST',
-      })
-        .then((response) => {
-          if (response.status === 200) {
-            console.log('Odjava uspješna');
-            this.$store.dispatch('setUser', null); // Pozivamo akciju za postavljanje trenutno prijavljenog korisnika na null
-            this.$router.push('/LoginPage'); // Preusmjeri korisnika na LoginPage nakon odjave
-          } else {
-            console.error('Greška prilikom odjave:', response.status);
-          }
-        })
-        .catch((error) => console.error('Greška prilikom odjave:', error));
-    },
+  verify(req, res, next) {
+    try {
+      let authorization = req.headers.authorization.split(" ");
+      let type = authorization[0];
+      let token = authorization[1];
+
+      if (type !== "Bearer") {
+        return res.status(401).send();
+      } else {
+        req.jwt = jwt.verify(token, process.env.JWT_SECRET);
+        return next();
+      }
+    } catch (e) {
+      return res.status(401).send();
+    }
+  },
+
+  async autenticateUser(username, password) {
+    let db = await connect();
+    let user = await db.collection("users").findOne({ username: username });
+    if (
+      user &&
+      user.password &&
+      (await bcrypt.compare(password, user.password))
+    ) {
+      delete user.password;
+      let token = jwt.sign(user, process.env.JWT_SECRET, {
+        algorithm: "HS512",
+        expiresIn: "1 week",
+      });
+
+      return {
+        token,
+        username: user.username,
+        name: user.name,
+        surname: user.surname,
+      };
+    } else {
+      throw new Error("Cannot authenticate");
+    }
   },
 };

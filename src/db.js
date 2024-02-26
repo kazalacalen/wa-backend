@@ -1,21 +1,31 @@
-import { MongoClient } from 'mongodb';
-import dotenv from 'dotenv';
 
-dotenv.config();
+import { MongoClient, ServerApiVersion } from "mongodb";
+let connection_string =
+  "mongodb+srv://admin:admin@cluster0.6drawhd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+const client = new MongoClient(connection_string, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverApi: ServerApiVersion.v1,
+});
 
-const dbConnect = async () => {
-    try {
-        const client = new MongoClient(process.env.DB_CONNECTION_STRING, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        });
-        await client.connect();
-        console.log('Uspješno povezivanje na MongoDB!');
-        return client.db('apartmani');
-    } catch (err) {
-        console.error('Došlo je do greške prilikom spajanja na MongoDB:', err);
-        throw err;
+let db = null;
+// eksportamo Promise koji resolva na konekciju
+export default () => {
+  return new Promise((resolve, reject) => {
+    // ako smo inicijalizirali bazu i klijent je još uvijek spojen
+    if (db && client.connected === true) {
+      resolve(db);
+    } else {
+      client.connect((err) => {
+        if (err) {
+          reject("Spajanje na bazu nije uspjelo:" + err);
+        } else {
+          console.log("Database connected successfully!");
+
+          db = client.db("apartmani");
+          resolve(db);
+        }
+      });
     }
+  });
 };
-
-export default dbConnect;
