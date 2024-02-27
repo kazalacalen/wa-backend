@@ -68,4 +68,28 @@ export default {
       throw new Error("Cannot authenticate");
     }
   },
+  async autenticateAdmin(username, password) {
+    let db = await connect();
+    let user = await db.collection("admins").findOne({ username: username });
+    if (
+      user &&
+      user.password &&
+      (await bcrypt.compare(password, user.password))
+    ) {
+      delete user.password;
+      let token = jwt.sign(user, process.env.JWT_SECRET, {
+        algorithm: "HS512",
+        expiresIn: "1 week",
+      });
+
+      return {
+        token,
+        username: user.username,
+        name: user.name,
+        surname: user.surname,
+      };
+    } else {
+      throw new Error("Cannot authenticate");
+    }
+  },
 };
