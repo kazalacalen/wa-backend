@@ -129,5 +129,64 @@ app.post("/dvoriste", async (req, res) => {
 
   res.json(data)
 });
+app.get("/apartmanget", async (req, res) => {
+  try {
+    let db = await connect();
+    let cursor = await db.collection("apartman").find();
+    let result = await cursor.toArray();
+    res.json(result);
+  } catch (error) {
+    console.error("Greška prilikom dohvaćanja apartmana:", error);
+    res.status(500).json({ error: "Greška prilikom dohvaćanja apartmana" });
+  }
+});
 
+
+app.get("/bazenget", async (req, res) => {
+  try {
+    let db = await connect();
+    let cursor = await db.collection("bazen").find();
+    let result = await cursor.toArray();
+    res.json(result);
+  } catch (error) {
+    console.error("Greška prilikom dohvaćanja bazena:", error);
+    res.status(500).json({ error: "Greška prilikom dohvaćanja bazena" });
+  }
+})
+
+app.get("/dvoristeget", async (req, res) => {
+  try {
+    let db = await connect();
+    let cursor = await db.collection("dvoriste").find();
+    let result = await cursor.toArray();
+    res.json(result);
+  } catch (error) {
+    console.error("Greška prilikom dohvaćanja dvorista:", error);
+    res.status(500).json({ error: "Greška prilikom dohvaćanja dvorista" });
+  }
+})
+
+app.get("/igraonicaget", async (req, res) => {
+  try {
+    let db = await connect();
+    let cursor = await db.collection("igraonica").find();
+    let result = await cursor.toArray();
+    res.json(result);
+  } catch (error) {
+    console.error("Greška prilikom dohvaćanja igraonice:", error);
+    res.status(500).json({ error: "Greška prilikom dohvaćanja igraonice" });
+  }
+})
+
+app.get("/studioget", async (req, res) => {
+  try {
+    let db = await connect();
+    let cursor = await db.collection("studio").find();
+    let result = await cursor.toArray();
+    res.json(result);
+  } catch (error) {
+    console.error("Greška prilikom dohvaćanja studia:", error);
+    res.status(500).json({ error: "Greška prilikom dohvaćanja studia" });
+  }
+})
 app.listen(port, () => console.log(`Slušam na portu ${port}!`));
